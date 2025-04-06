@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>땅따먹기 타워 디펜스</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .game-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(8, 50px);
+            grid-template-rows: repeat(8, 50px);
+            gap: 2px;
+            background-color: #333;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            background-color: #ddd;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s;
+        }
+        .cell:hover {
+            box-shadow: inset 0 0 0 3px #ffcc00;
+        }
+        .cell.selected {
+            box-shadow: inset 0 0 0 3px #ff7700;
+        }
+        .player1 {
+            background-color: #4285F4;
+        }
+        .player2 {
+            background-color: #EA4335;
+        }
+        .sidebar {
+            width: 250px;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .info-panel {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .build-panel button {
+            display: block;
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 8px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .build-panel button:hover {
+            background-color: #45a049;
+        }
+        .build-panel button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .status-bar {
+            width: 100%;
+            max-width: 600px;
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .tower {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            top: 5px;
+            left: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: white;
+        }
+        .tower-accuracy {
+            background-color: #3498db;
+        }
+        .tower-power {
+            background-color: #e74c3c;
+        }
+        .tower-range {
+            background-color: #2ecc71;
+        }
+        .wall {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #8e44ad;
+            top: 3px;
+            left: 3px;
+        }
+        .health-bar {
+            position: absolute;
+            bottom: 2px;
+            left: 5px;
+            height: 4px;
+            background-color: #2ecc71;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            text-align: center;
+            max-width: 400px;
+        }
+        .modal-content button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .progress-container {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .progress-bar {
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            flex-grow: 1;
+            margin: 0 5px;
+        }
+        .progress-fill-1 {
+            height: 100%;
+            background-color: #4285F4;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .progress-fill-2 {
+            height: 100%;
+            background-color: #EA4335;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .player-label {
+            font-weight: bold;
+        }
+        .combat-log {
+            width: 100%;
+            max-width: 600px;
+            height: 150px;
+            overflow-y: auto;
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .attack-animation {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: yellow;
+            border-radius: 50%;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body>
+    <h1>땅따먹기 타워 디펜스</h1>
+    
+    <div class="status-bar" id="status-bar">
+        플레이어 1의 턴 - 돈: <span id="money-display">500</span>
+    </div>
+    
+    <div class="progress-container">
+        <div class="player-label">플레이어 1</div>
+        <div class="progress-bar">
+            <div class="progress-fill-1" id="progress-1"></div>
+        </div>
+        <div class="player-label">플레이어 2</div>
+        <div class="progress-bar">
+            <div class="progress-fill-2" id="progress-2"></div>
+        </div>
+    </div>
+    
+    <div class="game-container">
+        <div class="board" id="game-board"></div>
+        
+        <div class="sidebar">
+            <div class="info-panel">
+                <h3>턴 정보</h3>
+                <p>현재 턴: <span id="turn-display">1</span></p>
+                <p>현재 플레이어: <span id="player-display">1</span></p>
+                <p>보유 금액: <span id="money-display-2">500</span></p>
+                <p>소유한 땅: <span id="territories-display">0/64 (0%)</span></p>
+                <button id="end-turn-btn">턴 종료</button>
+            </div>
+            
+            <div class="build-panel">
+                <h3>건설 옵션</h3>
+                <p>선택된 셀: <span id="selected-cell">없음</span></p>
+                <button id="buy-land-btn" disabled>땅 구매 (100)</button>
+                <button id="build-accuracy-tower-btn" disabled>정확도 포탑 건설 (200)</button>
+                <button id="build-power-tower-btn" disabled>공격력 포탑 건설 (300)</button>
+                <button id="build-range-tower-btn" disabled>사거리 포탑 건설 (250)</button>
+                <button id="build-wall-1-btn" disabled>약한 성벽 건설 (50)</button>
+                <button id="build-wall-2-btn" disabled>보통 성벽 건설 (100)</button>
+                <button id="build-wall-3-btn" disabled>강한 성벽 건설 (150)</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="combat-log" id="combat-log">
+        <div class="log-entry">게임이 시작되었습니다!</div>
+    </div>
+    
+    <div class="modal" id="game-over-modal">
+        <div class="modal-content">
+            <h2>게임 종료!</h2>
+            <p id="winner-message"></p>
+            <button id="restart-btn">다시 시작</button>
+        </div>
+    </div>
+
+    <script>
+        // 게임 상수
+        const GRID_SIZE = 8;
+        const TOTAL_CELLS = GRID_SIZE * GRID_SIZE;
+        const VICTORY_PERCENTAGE = 70;
+        const LAND_COST = 100;
+        const STARTING_MONEY = 500;
+        const INCOME_PER_LAND = 20;
+        const TOWER_COSTS = {
+            accuracy: 200,
+            power: 300,
+            range: 250
+        };
+        const WALL_COSTS = {
+            weak: 50,
+            medium: 100,
+            strong: 150
+        };
+        const WALL_HEALTH = {
+            weak: 100,
+            medium: 200,
+            strong: 300
+        };
+        
+        // 게임 상태
+        let gameState = {
+            board: Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(null)),
+            currentPlayer: 1,
+            turn: 1,
+            money: {1: STARTING_MONEY, 2: STARTING_MONEY},
+            territories: {1: 0, 2: 0},
+            selectedCell: null,
+            towers: [],
+            walls: [],
+            gameOver: false
+        };
+        
+        // DOM 요소
+        const gameBoardEl = document.getElementById('game-board');
+        const statusBarEl = document.getElementById('status-bar');
+        const moneyDisplayEl = document.getElementById('money-display');
+        const moneyDisplay2El = document.getElementById('money-display-2');
+        const turnDisplayEl = document.getElementById('turn-display');
+        const playerDisplayEl = document.getElementById('player-display');
+        const territoriesDisplayEl = document.getElementById('territories-display');
+        const selectedCellEl = document.getElementById('selected-cell');
+        const endTurnBtn = document.getElementById('end-turn-btn');
+        const buyLandBtn = document.getElementById('buy-land-btn');
+        const buildAccuracyTowerBtn = document.getElementById('build-accuracy-tower-btn');
+        const buildPowerTowerBtn = document.getElementById('build-power-tower-btn');
+        const buildRangeTowerBtn = document.getElementById('build-range-tower-btn');
+        const buildWall1Btn = document.getElementById('build-wall-1-btn');
+        const buildWall2Btn = document.getElementById('build-wall-2-btn');
+        const buildWall3Btn = document.getElementById('build-wall-3-btn');
+        const progress1El = document.getElementById('progress-1');
+        const progress2El = document.getElementById('progress-2');
+        const combatLogEl = document.getElementById('combat-log');
+        const gameOverModalEl = document.getElementById('game-over-modal');
+        const winnerMessageEl = document.getElementById('winner-message');
+        const restartBtn = document.getElementById('restart-btn');
+        
+        // 초기화 및 이벤트 설정
+        function init() {
+            initializeBoard();
+            
+            // 이벤트 리스너 설정
+            endTurnBtn.addEventListener('click', endTurn);
+            buyLandBtn.addEventListener('click', buyLand);
+            buildAccuracyTowerBtn.addEventListener('click', () => buildTower('accuracy'));
+            buildPowerTowerBtn.addEventListener('click', () => buildTower('power'));
+            buildRangeTowerBtn.addEventListener('click', () => buildTower('range'));
+            buildWall1Btn.addEventListener('click', () => buildWall('weak'));
+            buildWall2Btn.addEventListener('click', () => buildWall('medium'));
+            buildWall3Btn.addEventListener('click', () => buildWall('strong'));
+            restartBtn.addEventListener('click', restartGame);
+            
+            updateUI();
+        }
+        
+        // 보드 초기화
+        function initializeBoard() {
+            gameBoardEl.innerHTML = '';
+            
+            for (let row = 0; row < GRID_SIZE; row++) {
+                for (let col = 0; col < GRID_SIZE; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    
+                    cell.addEventListener('click', () => handleCellClick(row, col));
+                    
+                    gameBoardEl.appendChild(cell);
+                }
+            }
+            
+            // 초기 영토 설정
+            // 플레이어 1은 왼쪽 상단 코너에서 시작
+            setCellOwner(0, 0, 1);
+            // 플레이어 2는 오른쪽 하단 코너에서 시작
+            setCellOwner(GRID_SIZE - 1, GRID_SIZE - 1, 2);
+            
+            updateUI();
+        }
+        
+        // 셀 소유자 설정
+        function setCellOwner(row, col, player) {
+            const index = row * GRID_SIZE + col;
+            const cell = gameBoardEl.children[index];
+            
+            // 이전 소유자가 있었다면 카운트 감소
+            if (gameState.board[row][col] && gameState.board[row][col].owner) {
+                gameState.territories[gameState.board[row][col].owner]--;
+            }
+            
+            // 새 소유자 설정
+            gameState.board[row][col] = {
+                owner: player,
+                type: 'land'
+            };
+            
+            // 땅 소유 카운트 증가
+            gameState.territories[player]++;
+            
+            // 셀 스타일 업데이트
+            cell.className = 'cell';
+            if (player === 1) {
+                cell.classList.add('player1');
+            } else if (player === 2) {
+                cell.classList.add('player2');
+            }
+            
+            updateProgressBars();
+        }
+        
+        // 셀 클릭 처리
+        function handleCellClick(row, col) {
+            if (gameState.gameOver) return;
+            
+            // 이전에 선택된 셀이 있으면 선택 해제
+            if (gameState.selectedCell) {
+                const prevIndex = gameState.selectedCell.row * GRID_SIZE + gameState.selectedCell.col;
+                gameBoardEl.children[prevIndex].classList.remove('selected');
+            }
+            
+            // 새로운 셀 선택
+            gameState.selectedCell = {row, col};
+            const index = row * GRID_SIZE + col;
+            gameBoardEl.children[index].classList.add('selected');
+            
+            selectedCellEl.textContent = `(${row}, ${col})`;
+            
+            updateBuildButtons();
+        }
+        
+        // 건설 버튼 업데이트
+        function updateBuildButtons() {
+            if (!gameState.selectedCell) {
+                disableAllBuildButtons();
+                return;
+            }
+            
+            const {row, col} = gameState.selectedCell;
+            const cell = gameState.board[row][col];
+            
+            // 기본적으로 모든 버튼 비활성화
+            disableAllBuildButtons();
+            
+            // 빈 땅이고 인접한 내 땅이 있으면 구매 가능
+            if (!cell && hasAdjacentOwnedLand(row, col, gameState.currentPlayer)) {
+                buyLandBtn.disabled = gameState.money[gameState.currentPlayer] < LAND_COST;
+                return;
+            }
+            
+            // 내 땅이면 건설 가능
+            if (cell && cell.owner === gameState.currentPlayer && cell.type === 'land') {
+                buildAccuracyTowerBtn.disabled = gameState.money[gameState.currentPlayer] < TOWER_COSTS.accuracy;
+                buildPowerTowerBtn.disabled = gameState.money[gameState.currentPlayer] < TOWER_COSTS.power;
+                buildRangeTowerBtn.disabled = gameState.money[gameState.currentPlayer] < TOWER_COSTS.range;
+                buildWall1Btn.disabled = gameState.money[gameState.currentPlayer] < WALL_COSTS.weak;
+                buildWall2Btn.disabled = gameState.money[gameState.currentPlayer] < WALL_COSTS.medium;
+                buildWall3Btn.disabled = gameState.money[gameState.currentPlayer] < WALL_COSTS.strong;
+            }
+        }
+        
+        // 모든 건설 버튼 비활성화
+        function disableAllBuildButtons() {
+            buyLandBtn.disabled = true;
+            buildAccuracyTowerBtn.disabled = true;
+            buildPowerTowerBtn.disabled = true;
+            buildRangeTowerBtn.disabled = true;
+            buildWall1Btn.disabled = true;
+            buildWall2Btn.disabled = true;
+            buildWall3Btn.disabled = true;
+        }
+        
+        // 인접한 내 땅이 있는지 확인
+        function hasAdjacentOwnedLand(row, col, player) {
+            const directions = [
+                [-1, 0], [1, 0], [0, -1], [0, 1]
+            ];
+            
+            for (const [dr, dc] of directions) {
+                const newRow = row + dr;
+                const newCol = col + dc;
+                
+                if (newRow >= 0 && newRow < GRID_SIZE && newCol >= 0 && newCol < GRID_SIZE) {
+                    const cell = gameState.board[newRow][newCol];
+                    if (cell && cell.owner === player) {
+                        return true;
+                    }
+                }
+            }
+            
+            return false;
+        }
+        
+        // 땅 구매
+        function buyLand() {
+            if (!gameState.selectedCell) return;
+            
+            const {row, col} = gameState.selectedCell;
+            
+            // 이미 소유자가 있으면 구매 불가
+            if (gameState.board[row][col]) return;
+            
+            // 인접한 내 땅이 없으면 구매 불가
+            if (!hasAdjacentOwnedLand(row, col, gameState.currentPlayer)) return;
+            
+            // 돈이 부족하면 구매 불가
+            if (gameState.money[gameState.currentPlayer] < LAND_COST) return;
+            
+            // 돈 차감
+            gameState.money[gameState.currentPlayer] -= LAND_COST;
+            
+            // 소유자 설정
+            setCellOwner(row, col, gameState.currentPlayer);
+            
+            addLogEntry(`플레이어 ${gameState.currentPlayer}이(가) (${row}, ${col})에 땅을 구매했습니다.`);
+            
+            updateUI();
+        }
+        
+        // 타워 건설
+        function buildTower(type) {
+            if (!gameState.selectedCell) return;
+            
+            const {row, col} = gameState.selectedCell;
+            const cell = gameState.board[row][col];
+            
+            if (!cell || cell.owner !== gameState.currentPlayer || cell.type !== 'land') {
+                return;
+            }
+            
+            const cost = TOWER_COSTS[type];
+            if (gameState.money[gameState.currentPlayer] < cost) {
+                return;
+            }
+            
+            // 돈 차감
+            gameState.money[gameState.currentPlayer] -= cost;
+            
+            // 타워 특성 설정
+            let accuracy, power, range;
+            switch(type) {
+                case 'accuracy':
+                    accuracy = 90;
+                    power = 30;
+                    range = 2;
+                    break;
+                case 'power':
+                    accuracy = 60;
+                    power = 80;
+                    range = 1;
+                    break;
+                case 'range':
+                    accuracy = 70;
+                    power = 40;
+                    range = 3;
+                    break;
+            }
+            
+            // 타워 생성
+            const tower = {
+                row, col,
+                owner: gameState.currentPlayer,
+                type,
+                accuracy,
+                power,
+                range,
+                health: 200,
+                maxHealth: 200,
+                cost
+            };
+            
+            gameState.towers.push(tower);
+            
+            // 셀 타입 업데이트
+            gameState.board[row][col].type = 'tower';
+            gameState.board[row][col].towerIndex = gameState.towers.length - 1;
+            
+            // UI 업데이트
+            const index = row * GRID_SIZE + col;
+            const cellEl = gameBoardEl.children[index];
+            
+            const towerEl = document.createElement('div');
+            towerEl.className = `tower tower-${type}`;
+            towerEl.textContent = type.charAt(0).toUpperCase();
+            cellEl.appendChild(towerEl);
+            
+            const healthBar = document.createElement('div');
+            healthBar.className = 'health-bar';
+            healthBar.style.width = '40px';
+            cellEl.appendChild(healthBar);
+            
+            addLogEntry(`플레이어 ${gameState.currentPlayer}이(가) (${row}, ${col})에 ${type} 포탑을 건설했습니다.`);
+            
+            updateUI();
+        }
+        
+        // 성벽 건설
+        function buildWall(strength) {
+            if (!gameState.selectedCell) return;
+            
+            const {row, col} = gameState.selectedCell;
+            const cell = gameState.board[row][col];
+            
+            if (!cell || cell.owner !== gameState.currentPlayer || cell.type !== 'land') {
+                return;
+            }
+            
+            let wallType, cost, health;
+            switch(strength) {
+                case 'weak':
+                    cost = WALL_COSTS.weak;
+                    health = WALL_HEALTH.weak;
+                    break;
+                case 'medium':
+                    cost = WALL_COSTS.medium;
+                    health = WALL_HEALTH.medium;
+                    break;
+                case 'strong':
+                    cost = WALL_COSTS.strong;
+                    health = WALL_HEALTH.strong;
+                    break;
+            }
+            
+            if (gameState.money[gameState.currentPlayer] < cost) {
+                return;
+            }
+            
+            // 돈 차감
+            gameState.money[gameState.currentPlayer] -= cost;
+            
+            // 성벽 생성
+            const wall = {
+                row, col,
+                owner: gameState.currentPlayer,
+                type: 'wall',
+                strength,
+                health,
+                maxHealth: health,
+                cost
+            };
+            
+            gameState.walls.push(wall);
+            
+            // 셀 타입 업데이트
+            gameState.board[row][col].type = 'wall';
+            gameState.board[row][col].wallIndex = gameState.walls.length - 1;
+            
+            // UI 업데이트
+            const index = row * GRID_SIZE + col;
+            const cellEl = gameBoardEl.children[index];
+            
+            const wallEl = document.createElement('div');
+            wallEl.className = 'wall';
+            cellEl.appendChild(wallEl);
+            
+            const healthBar = document.createElement('div');
+            healthBar.className = 'health-bar';
+            healthBar.style.width = '40px';
+            cellEl.appendChild(healthBar);
+            
+            addLogEntry(`플레이어 ${gameState.currentPlayer}이(가) (${row}, ${col})에 ${strength} 성벽을 건설했습니다.`);
+            
+            updateUI();
+        }
+        
+        // 수입 수집
+        function collectIncome() {
+            const income = gameState.territories[gameState.currentPlayer] * INCOME_PER_LAND;
+            gameState.money[gameState.currentPlayer] += income;
+            
+            addLogEntry(`플레이어 ${gameState.currentPlayer}이(가) 턴 시작 시 ${income} 골드를 얻었습니다.`);
+        }
+        
+        // 턴 종료
+        function endTurn() {
+            // 타워 공격 처리
+            processTowerAttacks();
+            
+            // 다음 플레이어로 변경
+            gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+            
+            // 새 턴이면 플레이어 1의 차례
+            if (gameState.currentPlayer === 1) {
+                gameState.turn++;
+            }
+            
+            // 수입 계산
+            collectIncome();
+            
+            // 승리 조건 체크
+            checkVictoryCondition();
+            
+            // 선택 초기화
+            if (gameState.selectedCell) {
+                const index = gameState.selectedCell.row * GRID_SIZE + gameState.selectedCell.col;
+                gameBoardEl.children[index].classList.remove('selected');
+                gameState.selectedCell = null;
+                selectedCellEl.textContent = '없음';
+            }
+            
+            // UI 업데이트
+            updateUI();
+        }
+        
+        // 타워 공격 처리
+        function processTowerAttacks() {
+            // 현재 플레이어의 타워만 공격
+            const attackingTowers = gameState.towers.filter(tower => tower.owner === gameState.currentPlayer);
+            
+            for (const tower of attackingTowers) {
+                // 사거리 내의 적 구조물 찾기
+                const targets = findTargetsInRange(tower);
+                
+                if (targets.length === 0) continue;
+                
+                // 무작위 타겟 선택
+                const target = targets[Math.floor(Math.random() * targets.length)];
+                
+                // 명중 여부 확인
+                const hitChance = Math.random() * 100;
+                if (hitChance <= tower.accuracy) {
+                    // 명중
+                    const damage = tower.power;
+                    
+                    if (target.type === 'tower') {
+                        gameState.towers[target.index].health -= damage;
+                        
+                        // 체력바 업데이트
+                        updateHealthBar(target.row, target.col, gameState.towers[target.index].health, gameState.towers[target.index].maxHealth);
+                        
+                        addLogEntry(`플레이어 ${tower.owner}의 ${tower.type} 포탑이 플레이어 ${gameState.towers[target.index].owner}의 포탑에 ${damage} 데미지를 입혔습니다.`);
+                        
+                        // 애니메이션
+                        createAttackAnimation(tower.row, tower.col, target.row, target.col);
+                        
+                        // 파괴 체크
+                        if (gameState.towers[target.index].health <= 0) {
+                            destroyTower(target.index);
+                        }
+                    } else if (target.type === 'wall') {
+                        gameState.walls[target.index].health -= damage;
+                        
+                        // 체력바 업데이트
+                        updateHealthBar(target.row, target.col, gameState.walls[target.index].health, gameState.walls[target.index].maxHealth);
+                        
+                        addLogEntry(`플레이어 ${tower.owner}의 ${tower.type} 포탑이 플레이어 ${gameState.walls[target.index].owner}의 성벽에 ${damage} 데미지를 입혔습니다.`);
+                        
+                        // 애니메이션
+                        createAttackAnimation(tower.row, tower.col, target.row, target.col);
+                        
+                        // 파괴 체크
+                        if (gameState.walls[target.index].health <= 0) {
+                            destroyWall(target.index);
+                        }
+                    }
+                } else {
+                    // 빗나감
+                    addLogEntry(`플레이어 ${tower.owner}의 ${tower.type} 포탑의 공격이 빗나갔습니다.`);
+                }
+            }
+        }
+        
+        // 공격 애니메이션 생성
+        function createAttackAnimation(fromRow, fromCol, toRow, toCol) {
+            const fromIndex = fromRow * GRID_SIZE + fromCol;
+            const toIndex = toRow * GRID_SIZE + toCol;
+            
+            const fromRect = gameBoardEl.children[fromIndex].getBoundingClientRect();
+            const toRect = gameBoardEl.children[toIndex].getBoundingClientRect();
+            
+            const fromX = fromRect.left + fromRect.width / 2;
+            const fromY = fromRect.top + fromRect.height / 2;
+            const toX = toRect.left + toRect.width / 2;
+            const toY = toRect.top + toRect.height / 2;
+            
+            const projectile = document.createElement('div');
+            projectile.className = 'attack-animation';
+            document.body.appendChild(projectile);
